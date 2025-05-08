@@ -21,7 +21,16 @@ class PolicyUpdate(BaseModel):
     employer_id:uuid.UUID
     start_date: datetime 
     end_date: datetime
-    is_active: bool 
+    is_active: bool  
+
+
+class PolicyPatch(BaseModel):
+    plan_type  : Optional[str ] = None
+    policyholder_id:Optional[uuid.UUID] = None
+    employer_id:Optional[uuid.UUID] = None
+    start_date: Optional[datetime]  = None
+    end_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
 
      
 
@@ -38,7 +47,7 @@ class PolicyResponse(BaseModel):
 
     
      class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 

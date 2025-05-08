@@ -19,13 +19,22 @@ class EmployerUpdate(BaseModel):
      
 
 class EmployerResponse(BaseModel): 
-     uid : uuid.UUID
+     id : uuid.UUID
      name :str 
      contact_person :str
      contact_email  :str 
      contact_phone  :str
      created_at :datetime 
-     updated_at :datetime
+     updated_at :datetime 
+
+class EmployerPatch(BaseModel): 
+
+     name : Optional[str ] = None
+     contact_person :Optional[str] = None
+     contact_email  :Optional[str] = None
+     contact_phone  :Optional[str] = None
+    
+
 
 
 

@@ -6,8 +6,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from app.core import deps 
+from app.core.deps import AccessTokenBearer
+from app.db.session import get_db 
 from sqlmodel.ext.asyncio.session import AsyncSession
-from app.db.session import get_db
 from app.core.config import settings
 from app.core.security import get_password_hash,decode_url_safe_token,create_url_safe_token,create_access_token
 from app.cruds.crud_user import user as user_crud
@@ -15,12 +16,12 @@ from app.models.models import User, AuditAction
 from app.schemas.auth import Token, Login,PasswordResetConfirmModel,PasswordResetRequestModel
 from app.schemas.user import User as UserSchema, UserCreate
 from app.utils.audit import audit_service 
-from app.core.config import Settings
+from app.core.config import Settings 
 from app.utils.notification import NotificationService 
 
 
 
- 
+access_token_bearer = AccessTokenBearer()
 send_notification_emails = NotificationService.send_email_notification 
 
 router = APIRouter() 
@@ -29,8 +30,7 @@ router = APIRouter()
 async def login_access_token(
     request: Request,
     form_data: Login,
-    db: AsyncSession = Depends(get_db),
-   
+    db: AsyncSession = Depends(get_db)
 ) -> Any:
  
     """
@@ -76,7 +76,7 @@ async def login_access_token(
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_user)
 ) -> Any:
     """
     Refresh access token
@@ -98,7 +98,7 @@ async def register_user(
     request: Request,
     *,
     db: AsyncSession = Depends(get_db),
-    user_in: UserCreate,
+    user_in: UserCreate
 ) -> Any:
     """
     Register a new user (policyholder)
@@ -156,7 +156,7 @@ async def password_reset_request(user_data: PasswordResetRequestModel,db:Session
 async def reset_account_password(
     token: str,
     passwords: PasswordResetConfirmModel,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db)
 ):
     new_password = passwords.new_password
     confirm_password = passwords.confirm_new_password

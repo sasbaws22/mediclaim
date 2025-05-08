@@ -22,8 +22,11 @@ from sqlalchemy import func, select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional, Any
-from uuid import UUID
-from datetime import datetime
+from uuid import UUID 
+from app.core.deps import AccessTokenBearer
+from datetime import datetime  
+
+access_token_bearer = AccessTokenBearer(auto_error=True)
 
 @router.get("", response_model=List[dict])
 async def get_audit_logs(
@@ -36,11 +39,9 @@ async def get_audit_logs(
     entity_id: Optional[UUID] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    current_user: User = Depends(deps.get_current_admin_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Get audit logs with optional filtering (admin only)
-    """
+  
 
     # Build the base query
     query = select(AuditLog)
@@ -97,18 +98,12 @@ async def get_audit_logs(
     return final_result
 
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
-from typing import Optional, Any
-from uuid import UUID
-
 @router.get("/summary", response_model=dict)
 async def get_audit_summary(
     db: AsyncSession = Depends(get_db),
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
-    current_user: User = Depends(deps.get_current_admin_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get summary statistics of audit logs (admin only)
@@ -184,7 +179,7 @@ async def get_audit_summary(
 async def get_audit_log(
     log_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_admin_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get a specific audit log by ID (admin only)

@@ -8,18 +8,21 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.db.session import get_db
 from app.cruds.crud_user import user as user_crud 
 from app.cruds.base import CRUDBase
-from app.models.models import User
+from app.models.models import User 
+from app.core.deps import AccessTokenBearer
 from app.schemas.user import User as UserSchema, UserCreate, UserUpdate,UserPatch
 
-router = APIRouter()
+router = APIRouter() 
+access_token_bearer = AccessTokenBearer()
+
+
 base = CRUDBase(User)
 @router.get("/me")
 def read_user_me(
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Get current user
-    """
+
     return current_user
 
 @router.put("/me", response_model=UserSchema)
@@ -27,11 +30,10 @@ def update_user_me(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: UserUpdate,
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Update current user
-    """
+  
     user = user_crud.update(db, db_obj=current_user, obj_in=user_in)
     return user
 
@@ -40,11 +42,10 @@ async def read_users(
     db: AsyncSession = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    current_user: User = Depends(deps.get_current_admin_user),
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Retrieve users (admin only)
-    """
+ 
     users = await base.get_multi(db, skip=skip, limit=limit)
     return users
 
@@ -53,11 +54,9 @@ async def create_user(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: UserCreate,
-    current_user: User = Depends(deps.get_current_admin_user),
+    current_user: User = Depends(deps.get_current_user)
 ) -> Any:
-    """
-    Create new user (admin only)
-    """
+   
     user = user_crud.get_by_email(db, email=user_in.email)
     if user:
         raise HTTPException(
@@ -71,11 +70,10 @@ async def create_user(
 async def read_user_by_id(
     user_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_admin_user),
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Get a specific user by id (admin only)
-    """
+   
     user = await user_crud.get(db, id=user_id)
     if not user:
         raise HTTPException(
@@ -90,11 +88,10 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     user_id: str,
     user_in: UserUpdate,
-    current_user: User = Depends(deps.get_current_admin_user),
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Update a user (admin only)
-    """
+   
     user = await user_crud.get(db, id=user_id)
     if not user:
         raise HTTPException(
@@ -109,11 +106,10 @@ async def patch_user(
     user_id: UUID,
     user_in:UserPatch,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_admin_user)
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Update a user (admin only)
-    """
+   
     user = await user_crud.get(db, id=user_id)
     if not user:
         raise HTTPException(
@@ -128,11 +124,10 @@ async def delete_user(
     *,
     db: AsyncSession = Depends(get_db),
     user_id: str,
-    current_user: User = Depends(deps.get_current_admin_user),
+    current_user: User = Depends(deps.get_current_user),
+     _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Delete a user (admin only)
-    """
+ 
     user = await user_crud.get(db, id=user_id)
     if not user:
         raise HTTPException(

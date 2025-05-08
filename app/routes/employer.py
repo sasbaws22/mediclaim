@@ -2,26 +2,30 @@ from fastapi import APIRouter, Depends,status,Request
 from fastapi.exceptions import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
-from app.db.session import get_db
-from app.core.deps import get_current_admin_user
-from typing import List,Optional 
+from app.db.session import get_db 
+import uuid
+from app.core.deps import AccessTokenBearer,get_current_user
+from typing import List,Optional,Any  
+from app.cruds.base import CRUDBase
 from app.models.models import Employer,User
 from app.schemas.employer import (
     EmployerCreate,
-    EmployerUpdate
+    EmployerUpdate,
+    EmployerPatch,
+    EmployerResponse
    
 )
 
 router = APIRouter()
-
-
+access_token_bearer = AccessTokenBearer()
+base = CRUDBase(Employer)
 
 
 @router.post("") 
 async def create_employer(
     resource_data: EmployerCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    _: dict = Depends(access_token_bearer)
     ):
     employer_to_dict = resource_data.model_dump()
     new_employer = Employer(** employer_to_dict)
@@ -43,7 +47,7 @@ async def get_employer(
     contact_email:Optional[str]=None,
     contact_phone:Optional[str]=None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    _: dict = Depends(access_token_bearer)
     ):
       query = select(Employer)
       if name:
@@ -66,7 +70,7 @@ async def get_employer(
 async def get_employer(
     resource_id: str, 
     db: AsyncSession = Depends(get_db), 
-    current_user: User = Depends(get_current_admin_user)
+    _: dict = Depends(access_token_bearer)
     ):
      statement = select(Employer).where(Employer.id== resource_id)
      result = await db.exec(statement)
@@ -81,7 +85,7 @@ async def update_employer(
     resource_id: str, 
     employer_data: EmployerUpdate , 
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user) 
+    _: dict = Depends(access_token_bearer) 
     ): 
       statement = select(Employer).where(Employer.id== resource_id)
       result = await db.exec(statement)
@@ -101,14 +105,33 @@ async def update_employer(
 async def delete_employer(
     resource_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)):
+    _: dict = Depends(access_token_bearer)
+   ):
       statement = select(Employer).where(Employer.id== resource_id)
       result = await db.exec(statement)
       employer_to_delete = result.first()
-      if employer_to_delete is not None:
-        await db.delete(employer_to_delete)
-        await db.commit()
-        return {}
+      if employer_to_delete :
+         await db.commit()
+         return {}
       else:
        
-       return None 
+        return None 
+
+@router.patch("/{resource_id}")
+async def patch_employer(  
+    resource_id: uuid.UUID,
+    resource_in: EmployerPatch,
+    db: AsyncSession = Depends(get_db), 
+    _: dict = Depends(access_token_bearer)
+) -> Any:
+   
+    statement = select(Employer).where(Employer.id== resource_id)
+    result = await db.exec(statement) 
+    employer = result.first()
+    if not employer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employer not found",
+        )
+    Item = await base.patch(db,db_obj=Employer,obj_in=resource_in,id=resource_id)
+    return Item

@@ -12,8 +12,15 @@ from app.db.session import get_db
 from app.models.models import User, Claim, ClaimStatus, UserRole,Policy,ClaimAttachment,ReviewItem,Review,Payment,Employer
 from app.cruds.crud_user import user as user_crud
 from app.utils.notification import notification_service
-from app.core.config import settings
+from app.core.config import settings 
+from app.core.deps import AccessTokenBearer 
+from app.cruds.base import CRUDBase
+from app.schemas.claim import ClaimPatch,ClaimCreate,ClaimResponse,AttachmentPatch
 
+
+access_token_bearer = AccessTokenBearer(auto_error=True)
+base = CRUDBase(Claim) 
+bases = CRUDBase(ClaimAttachment)
 router = APIRouter()
 
 @router.get("", response_model=List[dict])
@@ -22,15 +29,13 @@ async def get_claims(
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get list of claims based on user role
     """
     query = select(Claim)
 
-    if current_user.role == UserRole.POLICYHOLDER:
-        query = query.join(Policy, Claim.policy_id == Policy.id).filter(Policy.policyholder_id == current_user.id)
     
     if status:
         query = query.filter(Claim.status == status)
@@ -66,7 +71,7 @@ async def create_claim(
     reason: str = Form(...),
     requested_amount: float = Form(...),
     attachments: List[UploadFile] = File(None),
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Create a new claim
@@ -82,11 +87,7 @@ async def create_claim(
             detail="Policy not found",
         )
     
-    if current_user.role == UserRole.POLICYHOLDER and policy.policyholder_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
+    
     
     # Generate unique reference number
     reference_number = f"CLM-{uuid.uuid4().hex[:8].upper()}"
@@ -156,7 +157,7 @@ async def create_claim(
 async def get_claim(
     claim_id: UUID,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get claim by ID
@@ -173,12 +174,7 @@ async def get_claim(
     # Check permissions
     result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
     policy = result.scalar_one_or_none()
-    if current_user.role == UserRole.POLICYHOLDER:
-        if policy is None or policy.policyholder_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions",
-            )
+   
 
     # Get attachments
     result = await db.execute(select(ClaimAttachment).where(ClaimAttachment.claim_id == claim.id))
@@ -290,7 +286,7 @@ async def update_claim_status(
     background_tasks: BackgroundTasks,
     status: str = Form(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Update claim status
@@ -305,9 +301,6 @@ async def update_claim_status(
     if not claim:
         return {"detail":"Claim not found"}
 
-    # Check permissions
-    if current_user.role == UserRole.POLICYHOLDER:
-        raise {"detail":"Not enough permissions"}
     
 
     # Update claim status
@@ -350,7 +343,7 @@ async def upload_attachment(
     claim_id: UUID,
     attachment: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+_: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Upload attachment for a claim
@@ -363,16 +356,6 @@ async def upload_attachment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Claim not found",
         )
-
-    # Check permissions
-    if current_user.role == UserRole.POLICYHOLDER:
-        result = await db.execute(select(Policy).filter(Policy.id == claim.policy_id))
-        policy = result.scalar_one_or_none()
-        if not policy or policy.policyholder_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions",
-            )
 
     # Create upload directory if it doesn't exist
     os.makedirs(settings.UPLOAD_DIRECTORY, exist_ok=True)
@@ -409,7 +392,7 @@ async def delete_attachment(
     claim_id: UUID,
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Delete attachment
@@ -423,15 +406,6 @@ async def delete_attachment(
             detail="Claim not found",
         )
 
-    # Check permissions
-    if current_user.role == UserRole.POLICYHOLDER:
-        result = await db.execute(select(Policy).filter(Policy.id == claim.policy_id))
-        policy = result.scalar_one_or_none()
-        if not policy or policy.policyholder_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions",
-            )
 
     # Fetch attachment
     result = await db.execute(
@@ -459,3 +433,41 @@ async def delete_attachment(
     return {
         "message": "Attachment deleted successfully"
     }
+
+@router.patch("/{claim_id}")
+async def patch_claim(  
+    claim_id: UUID,
+    claim_in: ClaimPatch,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(access_token_bearer)
+) -> Any:
+   
+    statement = select(Claim).where(Claim.id== claim_id)
+    result = await db.exec(statement) 
+    claim = result.first()
+    if not claim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Claim not found",
+        )
+    claim = await base.patch(db,db_obj=claim,obj_in=claim_in,id=claim_id)
+    return claim 
+
+@router.patch("/{claim_id}/attachments/{attachment_id}")
+async def patch_attachment(  
+    attachment_id: UUID,
+    attachment_in: AttachmentPatch,
+    db: AsyncSession = Depends(get_db), 
+    _: dict = Depends(access_token_bearer)
+) -> Any:
+   
+    statement = select(ClaimAttachment).where(ClaimAttachment.id== attachment_id)
+    result = await db.exec(statement) 
+    attachment = result.first()
+    if not attachment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attachment not found",
+        )
+    attachment = await bases.patch(db,db_obj=ClaimAttachment,obj_in=attachment_in,id=attachment_id)
+    return attachment

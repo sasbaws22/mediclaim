@@ -1,16 +1,20 @@
 from typing import Any, List, Optional
 from uuid import UUID
 from datetime import date
-
+from app.core.deps import AccessTokenBearer
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Form
 from sqlmodel.ext.asyncio.session import AsyncSession 
 from app.db.session import get_db 
 from sqlmodel import select
-from app.core import deps
+from app.core import deps 
+from app.cruds.base import CRUDBase
+from app.schemas.payments import PaymentCreate, PaymentResponse, PaymentPatch
 from app.models.models import User, Claim, Payment, PaymentStatus, ClaimStatus, UserRole,Policy
 from app.utils.notification import notification_service
 
-router = APIRouter()
+base = CRUDBase(Payment)
+router = APIRouter() 
+access_token_bearer = AccessTokenBearer()
 
 
 @router.get("", response_model=List[dict])
@@ -20,7 +24,7 @@ async def get_payments(
     limit: int = 100,
     claim_id: Optional[UUID] = None,
     payment_status: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get list of payments
@@ -33,14 +37,6 @@ async def get_payments(
     if payment_status:
         query = query.filter(Payment.payment_status == payment_status)
 
-    if current_user.role == UserRole.POLICYHOLDER:
-        # Policyholders can only see payments for their own claims
-        query = query.join(Payment.claim).join(Claim.policy).filter(Policy.policyholder_id == current_user.id)
-    elif current_user.role not in [UserRole.FINANCE, UserRole.ADMIN]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
 
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
@@ -84,7 +80,8 @@ async def create_payment(
     payment_amount: float = Form(...),
     payment_date: date = Form(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_finance_user),
+    current_user: User = Depends(deps.get_current_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Create a new payment for a claim
@@ -159,7 +156,7 @@ async def create_payment(
 async def get_payment(
     payment_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get payment by ID
@@ -175,31 +172,9 @@ async def get_payment(
         )
     
     # Check permissions
-    if current_user.role == UserRole.POLICYHOLDER:
-        # Get the claim and policy
-        claim_result = await db.execute(select(Claim).where(Claim.id == payment.claim_id))
-        claim = claim_result.scalar_one_or_none()
-        
-        if not claim:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Associated claim not found",
-            )
-        
-        policy_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
-        policy = policy_result.scalar_one_or_none()
-        
-        if not policy or policy.policyholder_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions",
-            )
     
-    elif current_user.role not in [UserRole.FINANCE, UserRole.ADMIN]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
+    # policy_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
+    # policy = policy_result.scalar_one_or_none()
     
     # Fetch processor
     processor_name = "Unknown"
@@ -255,18 +230,12 @@ async def update_payment(
     payment_date: Optional[date] = Form(None),
     payment_status: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_finance_user),
+     _: dict = Depends(access_token_bearer)
+ 
 ) -> Any:
     """
     Update payment by ID
     """
-
-    # Ensure finance user
-    if current_user.role != UserRole.FINANCE:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
 
     # Get the payment
     result = await db.execute(select(Payment).filter(Payment.id == payment_id))
@@ -335,3 +304,21 @@ async def update_payment(
         "payment_status": payment.payment_status,
         "message": "Payment updated successfully"
     }
+@router.patch("/{payment_id}")
+async def patch_payment(  
+    payment_id: UUID,
+    payment_in: PaymentPatch,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(access_token_bearer)
+) -> Any:
+   
+    statement = select(Payment).where(Payment.id== payment_id)
+    result = await db.exec(statement) 
+    payment = result.first()
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+    payment = await base.patch(db,db_obj=payment,obj_in=payment_in,id=payment_id)
+    return payment

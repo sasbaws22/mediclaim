@@ -5,10 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core import deps 
 from app.db.session import get_db 
-from sqlmodel import select
-from app.models.models import User, Claim, Review, ReviewType, ReviewDecision, ReviewItem, ReviewItemStatus, UserRole,ClaimStatus,Policy
+from sqlmodel import select 
+from app.core.deps import AccessTokenBearer
+from app.models.models import User, Claim, Review, ReviewType, ReviewDecision, ReviewItem, ReviewItemStatus, UserRole,ClaimStatus,Policy 
+from app.schemas.review import ReviewCreate,ReviewPatch,ReviewResponse 
+from app.cruds.base import CRUDBase
 
 router = APIRouter()
+access_token_bearer = AccessTokenBearer()  
+base = CRUDBase(Review)
 
 @router.get("", response_model=List[dict])
 async def get_reviews(
@@ -17,11 +22,10 @@ async def get_reviews(
     limit: int = 100,
     claim_id: Optional[UUID] = None,
     review_type: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_active_user), 
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Get list of reviews
-    """
+
     # Build query
     query = select(Review)
 
@@ -94,7 +98,8 @@ async def create_review(
     decision: str = Form(...),
     rejection_reason: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    current_user: User = Depends(deps.get_current_active_user), 
+     _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Create a new review for a claim
@@ -176,8 +181,8 @@ async def create_review(
 @router.get("/{review_id}", response_model=dict)
 async def get_review(
     review_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    db: AsyncSession = Depends(get_db), 
+     _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get review by ID
@@ -193,25 +198,25 @@ async def get_review(
         )
 
     # Permission checks
-    if current_user.role == UserRole.POLICYHOLDER:
-        claim_result = await db.execute(select(Claim).where(Claim.id == review.claim_id))
-        claim = claim_result.scalar_one_or_none()
-        if not claim:
-            raise HTTPException(status_code=404, detail="Claim not found")
+    # if current_user.role == UserRole.POLICYHOLDER:
+    #     claim_result = await db.execute(select(Claim).where(Claim.id == review.claim_id))
+    #     claim = claim_result.scalar_one_or_none()
+    #     if not claim:
+    #         raise HTTPException(status_code=404, detail="Claim not found")
 
-        policy_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
-        policy = policy_result.scalar_one_or_none()
-        if not policy or policy.policyholder_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Not enough permissions")
+    #     policy_result = await db.execute(select(Policy).where(Policy.id == claim.policy_id))
+    #     policy = policy_result.scalar_one_or_none()
+    #     if not policy or policy.policyholder_id != current_user.id:
+    #         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    elif current_user.role == UserRole.CUSTOMER_SERVICE and review.review_type != ReviewType.CUSTOMER_SERVICE:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    # elif current_user.role == UserRole.CUSTOMER_SERVICE and review.review_type != ReviewType.CUSTOMER_SERVICE:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    elif current_user.role == UserRole.CLAIMS and review.review_type != ReviewType.CLAIMS:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    # elif current_user.role == UserRole.CLAIMS and review.review_type != ReviewType.CLAIMS:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    elif current_user.role == UserRole.MD and review.review_type != ReviewType.MD:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    # elif current_user.role == UserRole.MD and review.review_type != ReviewType.MD:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Get reviewer
     reviewer_result = await db.execute(select(User).where(User.id == review.reviewer_id))
@@ -255,12 +260,10 @@ async def update_review(
     comments: Optional[str] = Form(None),
     decision: Optional[str] = Form(None),
     rejection_reason: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    db: AsyncSession = Depends(get_db), 
+     _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Update review by ID
-    """
+  
     # Fetch the review instance
     result = await db.execute(select(Review).where(Review.id == review_id))
     review = result.scalar_one_or_none()
@@ -271,12 +274,6 @@ async def update_review(
             detail="Review not found",
         )
     
-    # Check permission
-    if current_user.id != review.reviewer_id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions",
-        )
 
     # Validate decision if provided
     if decision and decision not in [
@@ -318,12 +315,10 @@ async def add_review_item(
     approved_amount: float = Form(...),
     status: str = Form(...),
     rejection_reason: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+    db: AsyncSession = Depends(get_db), 
+     _: dict = Depends(access_token_bearer)
 ) -> Any:
-    """
-    Add review item
-    """
+   
     # Fetch review
     result = await db.execute(select(Review).where(Review.id == review_id))
     review = result.scalar_one_or_none()
@@ -331,9 +326,6 @@ async def add_review_item(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    # Permission check
-    if current_user.id != review.reviewer_id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Validate status
     if status not in [ReviewItemStatus.APPROVED, ReviewItemStatus.REJECTED]:
@@ -354,11 +346,11 @@ async def add_review_item(
     await db.refresh(review_item)
 
     # Update claim approved amount if MD review
-    if review.review_type == ReviewType.MD:
-        claim_result = await db.execute(select(Claim).where(Claim.id == review.claim_id))
-        claim = claim_result.scalar_one_or_none()
+    # if review.review_type == ReviewType.MD:
+    claim_result = await db.execute(select(Claim).where(Claim.id == review.claim_id))
+    claim = claim_result.scalar_one_or_none()
 
-        if claim:
+    if claim:
             item_result = await db.execute(select(ReviewItem).where(ReviewItem.review_id == review_id))
             items = item_result.scalars().all()
             total_approved = sum(item.approved_amount for item in items)
@@ -385,7 +377,7 @@ async def update_review_item(
     status: Optional[str] = Form(None),
     rejection_reason: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_user),
+     _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Update review item
@@ -407,9 +399,9 @@ async def update_review_item(
     if not review_item:
         raise HTTPException(status_code=404, detail="Review item not found")
 
-    # Check permissions
-    if current_user.id != review.reviewer_id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    # # Check permissions
+    # if current_user.id != review.reviewer_id and current_user.role != UserRole.ADMIN:
+    #     raise HTTPException(status_code=403, detail="Not enough permissions")
     
     # Validate status
     if status and status not in [ReviewItemStatus.APPROVED, ReviewItemStatus.REJECTED]:
@@ -430,12 +422,10 @@ async def update_review_item(
     await db.commit()
     await db.refresh(review_item)
 
-    # If MD review, recalculate approved amount on claim
-    if review.review_type == ReviewType.MD:
-        result = await db.execute(select(Claim).where(Claim.id == review.claim_id))
-        claim = result.scalar_one_or_none()
+    result = await db.execute(select(Claim).where(Claim.id == review.claim_id))
+    claim = result.scalar_one_or_none()
 
-        if claim:
+    if claim:
             result = await db.execute(
                 select(ReviewItem.approved_amount)
                 .where(ReviewItem.review_id == review_id)
@@ -451,4 +441,42 @@ async def update_review_item(
         "requested_amount": review_item.requested_amount,
         "approved_amount": review_item.approved_amount,
         "status": review_item.status,
-    }
+    } 
+
+@router.patch("/{review_id}")
+async def patch_review(  
+    review_id: UUID,
+    review_in: ReviewPatch,
+    db: AsyncSession = Depends(get_db), 
+    _: dict = Depends(access_token_bearer)
+) -> Any:
+   
+    statement = select(Review).where(Review.id== review_id)
+    result = await db.exec(statement) 
+    review = result.first()
+    if not review:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Review not found",
+        )
+    review = await base.patch(db,db_obj=Review,obj_in=review_in,id=review_id)
+    return review 
+
+@router.patch("/{review_id}/items/{item_id}")
+async def patch_reviewItem(  
+    item_id: UUID,
+    item_in: ReviewPatch,
+    db: AsyncSession = Depends(get_db), 
+    _: dict = Depends(access_token_bearer)
+) -> Any:
+   
+    statement = select(ReviewItem).where(ReviewItem.id== item_id)
+    result = await db.exec(statement) 
+    item = result.first()
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item not found",
+        )
+    Item = await base.patch(db,db_obj=ReviewItem,obj_in=item_in,id=item_id)
+    return Item
