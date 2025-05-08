@@ -67,7 +67,8 @@ async def login_access_token(
         ), 
         "user": {"email":user.email,
                  "full_name":user.full_name,
-                 "is_active":user.is_active
+                 "is_active":user.is_active,
+                 "role":user.role
                  },
         "token_type": "bearer"
     }
