@@ -65,7 +65,8 @@ async def login_access_token(
                         expiry= access_token_expires,
                         refresh=refresh                 
         ), 
-        "user": {"email":user.email,
+        "user": {"id":user.id,
+                 "email":user.email,
                  "full_name":user.full_name,
                  "is_active":user.is_active,
                  "role":user.role
@@ -109,11 +110,7 @@ async def register_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The user with this email already exists in the system",
-        )
-    
-    # Force role to be POLICYHOLDER for registration endpoint
-    user_in.role = "POLICYHOLDER"
-    
+        ) 
     user = await user_crud.create(db, obj_in=user_in)
     
     # Log user creation
