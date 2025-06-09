@@ -16,7 +16,6 @@ app = FastAPI(
     version=version,
     license_info={"name": "MIT License", "url": "https://opensource.org/license/mit"},
     contact={
-        "name": "FAAB System Gh.",
         "url": "https://github.com/sasbaws22",
         "email": "ssako@faabsystems.com",
     },
