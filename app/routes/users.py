@@ -4,6 +4,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core import deps 
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession 
 from app.db.session import get_db
 from app.cruds.crud_user import user as user_crud 
@@ -40,14 +41,12 @@ def update_user_me(
 @router.get("")
 async def read_users(
     db: AsyncSession = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
     current_user: User = Depends(deps.get_current_user), 
     _: dict = Depends(access_token_bearer)
 ) -> Any:
- 
-    users = await base.get_multi(db, skip=skip, limit=limit)
-    return users
+
+    users = await db.execute(select(User))
+    return users.scalars().all()
 
 @router.post("")
 async def create_user(
