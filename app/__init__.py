@@ -38,6 +38,7 @@ api_router.include_router(audit.router, prefix=f"{version_prefix}/audit", tags=[
 api_router.include_router(policy.router, prefix=f"{version_prefix}/policy", tags=["Policy"]) 
 api_router.include_router(employer.router, prefix=f"{version_prefix}/employer", tags=["Employer"]) 
 api_router.include_router(policyholder.router, prefix=f"{version_prefix}/policyholders", tags=["Policyholders"])
+api_router.include_router(provider.router, prefix=f"{version_prefix}/providers", tags=["Providers"])
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -49,5 +50,5 @@ def root():
 def health_check():
     return {"status": "ok"}
 
-api_router.include_router(provider.router, prefix=f"{version_prefix}/providers", tags=["Providers"])
+
 

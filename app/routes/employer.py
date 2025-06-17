@@ -51,20 +51,20 @@ async def get_employer(
     ):
       query = select(Employer)
       if name:
-        query = query.where(Employer.name == name) 
+        query = query.filter(Employer.name == name) 
       
       if contact_person:
-        query = query.where(Employer.contact_person == contact_person)
+        query = query.filter(Employer.contact_person == contact_person)
 
       if contact_email:
-        query = query.where(Employer.contact_email == contact_email) 
+        query = query.filter(Employer.contact_email == contact_email) 
      
       if contact_phone:
-        query = query.where(Employer.contact_phone == contact_phone) 
+        query = query.filter(Employer.contact_phone == contact_phone) 
 
-      result = await db.exec(query)
-
-      return result
+      result = await db.execute(query)
+      Employers= result.scalars().all()
+      return Employers
 
 @router.get("/{resource_id}")
 async def get_employer(
