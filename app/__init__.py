@@ -1,4 +1,4 @@
-from app.routes import audit, auth, claims,payments, reviews,users,policy,employer
+from app.routes import audit, auth, claims,payments, reviews,users,policy,employer,provider,policyholder
 from fastapi import FastAPI, APIRouter
 
 
@@ -37,6 +37,7 @@ api_router.include_router(payments.router, prefix=f"{version_prefix}/payments", 
 api_router.include_router(audit.router, prefix=f"{version_prefix}/audit", tags=["audit"])
 api_router.include_router(policy.router, prefix=f"{version_prefix}/policy", tags=["Policy"]) 
 api_router.include_router(employer.router, prefix=f"{version_prefix}/employer", tags=["Employer"]) 
+api_router.include_router(policyholder.router, prefix=f"{version_prefix}/policyholders", tags=["Policyholders"])
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -47,3 +48,6 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+api_router.include_router(provider.router, prefix=f"{version_prefix}/providers", tags=["Providers"])
+

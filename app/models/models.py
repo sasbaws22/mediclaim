@@ -114,6 +114,7 @@ class Policy(SQLModel,table=True):
     plan_type  :str = Field(default=None,nullable=False ) 
     policyholder_id :Optional[uuid.UUID] =  Field( nullable=True, foreign_key="users.id",default=None)
     employer_id:Optional[uuid.UUID] =  Field( nullable=True, foreign_key="employers.id",default=None)
+    provider_id:Optional[uuid.UUID] =  Field( nullable=True, foreign_key="providers.id",default=None)
     start_date: datetime = Field(default_factory=datetime.now)
     end_date: datetime = Field(default_factory=datetime.now)
     is_active: bool = Field( default=True)
@@ -123,6 +124,7 @@ class Policy(SQLModel,table=True):
     # Relationships
     policyholder:User = Relationship(back_populates="policies",sa_relationship_kwargs={"lazy": "selectin"})
     employer:"Employer" = Relationship(back_populates="policies",sa_relationship_kwargs={"lazy": "selectin"})
+    provider:"Provider" = Relationship(back_populates="policies",sa_relationship_kwargs={"lazy": "selectin"})
     claims:"Claim" = Relationship(back_populates="policies",sa_relationship_kwargs={"lazy": "selectin"})
 
 class Claim(SQLModel,table=True):
@@ -257,3 +259,23 @@ class AuditLog(SQLModel,table=True):
 
     # Relationships
     user:User = Relationship(back_populates="audit_logs",sa_relationship_kwargs={"lazy": "selectin"})
+
+
+
+class Provider(SQLModel,table=True):
+    __tablename__ = "providers"
+
+    id : uuid.UUID = Field(
+        sa_column=Column(pg.UUID, nullable=False, primary_key=True, default=uuid.uuid4)
+    )
+    name :str = Field(default=None,nullable=False )
+    contact_person :str = Field(default=None,nullable=False )
+    contact_email  :str = Field(default=None,nullable=False, unique=True )
+    contact_phone  :str = Field(default=None,nullable=False )
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now})
+
+    # Relationships
+    policies:List["Policy"] = Relationship(back_populates="provider",sa_relationship_kwargs={"lazy": "selectin"})
+
+
