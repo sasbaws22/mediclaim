@@ -16,7 +16,8 @@ access_token_bearer = AccessTokenBearer()
 async def create_provider(
     *,
     db: AsyncSession = Depends(get_db),
-    provider_in: ProviderCreate
+    provider_in: ProviderCreate,
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Register a new insurance provider
@@ -34,7 +35,8 @@ async def create_provider(
 async def read_providers(
     db: AsyncSession = Depends(get_db),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=100)
+    limit: int = Query(100, ge=1, le=100),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Retrieve all insurance providers.
@@ -45,7 +47,8 @@ async def read_providers(
 @router.get("/{provider_id}", response_model=ProviderRead)
 async def read_provider_by_id(
     provider_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Get a specific insurance provider by ID.
@@ -62,7 +65,8 @@ async def read_provider_by_id(
 async def update_provider(
     provider_id: UUID,
     provider_in: ProviderUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Update an insurance provider by ID.
@@ -79,7 +83,8 @@ async def update_provider(
 @router.delete("/{provider_id}", response_model=ProviderRead)
 async def delete_provider(
     provider_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(access_token_bearer)
 ) -> Any:
     """
     Delete an insurance provider by ID.
