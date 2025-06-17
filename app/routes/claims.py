@@ -156,8 +156,7 @@ async def create_claim(
 @router.get("/{claim_id}", response_model=dict)
 async def get_claim(
     claim_id: UUID,
-    db: AsyncSession = Depends(deps.get_db),
-    _: dict = Depends(access_token_bearer)
+    db: AsyncSession = Depends(deps.get_db)
 ) -> Any:
     """
     Get claim by ID
