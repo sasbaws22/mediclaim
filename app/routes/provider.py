@@ -11,18 +11,6 @@ from app.models.models import User, UserRole
 router = APIRouter()
 access_token_bearer = AccessTokenBearer()
 
-# async def get_current_admin_or_superadmin(
-#     current_user: User = Depends(get_current_active_user),
-# ) -> User:
-#     """
-#     Validate that the current user is an admin or superadmin
-#     """
-#     if current_user.role not in [UserRole.ADMIN]:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="Access denied. Admin or Superadmin role required."
-#         )
-#     return current_user
 
 @router.post("/", response_model=ProviderRead)
 async def create_provider(
